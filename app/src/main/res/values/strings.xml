@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Map Application</string>
+    <string name="title_explore">Explore</string>
+    <string name="title_contribute">Contribute</string>
+    <string name="title_groups">Groups</string>
+
+    <string name="haha">HAHA</string>
+</resources>
