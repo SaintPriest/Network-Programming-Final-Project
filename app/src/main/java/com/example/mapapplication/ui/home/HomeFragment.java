@@ -91,9 +91,6 @@ public class HomeFragment extends Fragment {
          */
         @Override
         public void onMapReady(GoogleMap googleMap) {
-            LatLng sydney = new LatLng(-34, 151);
-            googleMap.addMarker(new MarkerOptions().position(sydney).title("Marker in Sydney"));
-            googleMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
             googleMap.setInfoWindowAdapter(new GoogleMap.InfoWindowAdapter() {
                 @Nullable
                 @Override
@@ -117,8 +114,6 @@ public class HomeFragment extends Fragment {
                 }
             });
 
-            homeViewModel.load();
-
             googleMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
                 @Override
                 public void onMapClick(@NonNull LatLng latLng) {
@@ -127,12 +122,32 @@ public class HomeFragment extends Fragment {
                     markerOptions.title(latLng.latitude + " KG " + latLng.longitude);
                     markerOptions.snippet("Population: 4,137,400");
                     //markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED));
-                    googleMap.clear();
-                    googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 12));
+                    //googleMap.clear();
+                    googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 14));
                     Marker marker = googleMap.addMarker(markerOptions);
                     marker.showInfoWindow();
                 }
             });
+
+            googleMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
+                @Override
+                public boolean onMarkerClick(@NonNull Marker marker) {
+                    googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(marker.getPosition(), 14));
+                    marker.showInfoWindow();
+                    return true;
+                }
+            });
+
+            homeViewModel.load();
+            Marker marker = null;
+            for (DiscountItem item : homeViewModel.discountItemList)
+            {
+                marker = googleMap.addMarker(new MarkerOptions().position(new LatLng(item.lat, item.lng)).title(item.name));
+            }
+            if (marker != null) {
+                googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(marker.getPosition(), 14));
+                marker.showInfoWindow();
+            }
         }
     };
 }

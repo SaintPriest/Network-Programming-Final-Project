@@ -21,7 +21,7 @@ public class HttpHelper {
     public static final String SERVER_URL_PREFIX = "https://qwer87511.pythonanywhere.com";
 
     public static String testRequest() {
-        final String TEST_URL_POSTFIX = "/";
+        final String TEST_URL_POSTFIX = "/explore/discounts/all";
         return post(SERVER_URL_PREFIX + TEST_URL_POSTFIX, new JSONObject().toString());
     }
 
