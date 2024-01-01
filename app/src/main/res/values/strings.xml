@@ -5,4 +5,13 @@
     <string name="title_groups">Groups</string>
 
     <string name="haha">HAHA</string>
+
+    <string name="name">Name</string>
+    <string name="lat">Lat</string>
+    <string name="lng">Lng</string>
+    <string name="address">Address</string>
+    <string name="price">Price</string>
+    <string name="sp">Special Price</string>
+    <string name="group">Group</string>
+    <string name="contribute">Contribute</string>
 </resources>

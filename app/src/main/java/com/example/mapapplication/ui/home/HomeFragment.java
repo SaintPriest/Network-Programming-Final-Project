@@ -1,6 +1,12 @@
 package com.example.mapapplication.ui.home;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.graphics.Paint;
+import android.location.Address;
+import android.location.Geocoder;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -9,11 +15,16 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.navigation.NavOptions;
+import androidx.navigation.Navigation;
 
 import com.example.mapapplication.R;
 import com.example.mapapplication.databinding.FragmentHomeBinding;
+import com.example.mapapplication.util.HttpHelper;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -23,10 +34,22 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
-public class HomeFragment extends Fragment {
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+public class HomeFragment extends Fragment implements GoogleMap.InfoWindowAdapter {
 
     private FragmentHomeBinding binding;
     private HomeViewModel homeViewModel;
+    private Map<Marker, DiscountItem> markerItemMap = new HashMap<>();
+    private HomeFragment self = this;
+    private View selfView;
+    private View mapInfoWindow = null;
+    private GoogleMap googleMap = null;
+    private Marker lastMarker = null;
 
     public View onCreateView(@NonNull LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {
@@ -34,6 +57,24 @@ public class HomeFragment extends Fragment {
 
         View view = inflater.inflate(R.layout.fragment_maps, container, false);
         binding = FragmentHomeBinding.inflate(inflater, container, false);
+        selfView = view;
+
+        homeViewModel.discountItemList.observe(getViewLifecycleOwner(), new Observer<List<DiscountItem>>() {
+            @Override
+            public void onChanged(List<DiscountItem> discountItems) {
+                if (googleMap == null) {
+                    return;
+                }
+
+                googleMap.clear();
+                for (DiscountItem item : homeViewModel.discountItemList.getValue())
+                {
+                    lastMarker = googleMap.addMarker(new MarkerOptions().position(new LatLng(item.lat, item.lng)).title(item.name));
+                    markerItemMap.put(lastMarker, item);
+                }
+            }
+        });
+
         return view;
 
         //View view = inflater.inflate(R.layout.fragment_maps, container, false);
@@ -91,26 +132,38 @@ public class HomeFragment extends Fragment {
          */
         @Override
         public void onMapReady(GoogleMap googleMap) {
-            googleMap.setInfoWindowAdapter(new GoogleMap.InfoWindowAdapter() {
-                @Nullable
-                @Override
-                public View getInfoContents(@NonNull Marker marker) {
-                    View view = getLayoutInflater().inflate(R.layout.map_info_window_layout, binding.getRoot());
-                    Button button = view.findViewById(R.id.mapInfoButton);
-                    button.setText(R.string.haha);
-                    button.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            // TODO: Delete the marker
-                        }
-                    });
-                    return view;
-                }
+            self.googleMap = googleMap;
 
-                @Nullable
+            if (!(ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)) {
+                googleMap.setMyLocationEnabled(true);
+            }
+
+            googleMap.setInfoWindowAdapter(self);
+
+            googleMap.setOnInfoWindowClickListener(new GoogleMap.OnInfoWindowClickListener() {
                 @Override
-                public View getInfoWindow(@NonNull Marker marker) {
-                    return null;
+                public void onInfoWindowClick(@NonNull Marker marker) {
+                    DiscountItem item = markerItemMap.get(marker);
+                    if (item != null) {
+                        HttpHelper.deleteDiscount(item.name);
+                        homeViewModel.load();
+                    }
+                    else {
+                        Bundle bundle = new Bundle();
+                        bundle.putString("lat", String.valueOf(marker.getPosition().latitude));
+                        bundle.putString("lng", String.valueOf(marker.getPosition().longitude));
+                        try {
+                            Geocoder geocoder = new Geocoder(getContext(), Locale.getDefault());
+                            Address address = geocoder.getFromLocation(marker.getPosition().latitude, marker.getPosition().longitude, 1).get(0);
+                            bundle.putString("address", address.getAddressLine(0));
+                        } catch (IOException e) {
+                        }
+                        Navigation.findNavController(selfView).navigate(R.id.action_navigation_home_to_navigation_dashboard,
+                                bundle,
+                                new NavOptions.Builder()
+                                        .setPopUpTo(R.id.navigation_home, true)
+                                        .build());
+                    }
                 }
             });
 
@@ -120,7 +173,6 @@ public class HomeFragment extends Fragment {
                     MarkerOptions markerOptions = new MarkerOptions();
                     markerOptions.position(latLng);
                     markerOptions.title(latLng.latitude + " KG " + latLng.longitude);
-                    markerOptions.snippet("Population: 4,137,400");
                     //markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED));
                     //googleMap.clear();
                     googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 14));
@@ -139,15 +191,74 @@ public class HomeFragment extends Fragment {
             });
 
             homeViewModel.load();
-            Marker marker = null;
-            for (DiscountItem item : homeViewModel.discountItemList)
-            {
-                marker = googleMap.addMarker(new MarkerOptions().position(new LatLng(item.lat, item.lng)).title(item.name));
-            }
-            if (marker != null) {
-                googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(marker.getPosition(), 14));
-                marker.showInfoWindow();
+            Log.d(toString(), "111");
+
+//            Marker marker = null;
+//            for (DiscountItem item : homeViewModel.discountItemList)
+//            {
+//                marker = googleMap.addMarker(new MarkerOptions().position(new LatLng(item.lat, item.lng)).title(item.name));
+//                markerItemMap.put(marker, item);
+//            }
+            if (lastMarker != null) {
+                googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(lastMarker.getPosition(), 14));
+                lastMarker.showInfoWindow();
             }
         }
     };
+
+    @Nullable
+    @Override
+    public View getInfoContents(@NonNull Marker marker) {
+        if (mapInfoWindow == null)
+        {
+            mapInfoWindow = getLayoutInflater().inflate(R.layout.activity_map_info_window, binding.getRoot());
+        }
+        View view = mapInfoWindow;
+
+        DiscountItem item = markerItemMap.get(marker);
+
+        Button button = view.findViewById(R.id.mapInfoButton);
+
+        if (item != null)
+        {
+            ((TextView) view.findViewById(R.id.mapInfoText1)).setText(item.name);
+            ((TextView) view.findViewById(R.id.mapInfoText2)).setText(item.address);
+            TextView tv3 = view.findViewById(R.id.mapInfoText3);
+            tv3.setText(String.valueOf(item.price));
+            tv3.setPaintFlags(tv3.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
+            try {
+                ((TextView) view.findViewById(R.id.mapInfoText4)).setText(String.format("%d %% off", (((item.price - item.sp) * 100) / item.price)));
+            }
+            catch (Exception e) {
+            }
+            ((TextView) view.findViewById(R.id.mapInfoText5)).setText(String.valueOf(item.sp));
+
+            button.setText("Delete");
+        }
+        else
+        {
+            try {
+                Geocoder geocoder = new Geocoder(getContext(), Locale.getDefault());
+                Address address = geocoder.getFromLocation(marker.getPosition().latitude, marker.getPosition().longitude, 1).get(0);
+                ((TextView) view.findViewById(R.id.mapInfoText1)).setText(address.getAddressLine(0));
+            } catch (IOException e) {
+                ((TextView) view.findViewById(R.id.mapInfoText1)).setText("New");
+            }
+
+            ((TextView) view.findViewById(R.id.mapInfoText2)).setText(String.format("lat: %f, lng: %f", marker.getPosition().latitude, marker.getPosition().longitude));
+            ((TextView) view.findViewById(R.id.mapInfoText3)).setText("");
+            ((TextView) view.findViewById(R.id.mapInfoText4)).setText("");
+            ((TextView) view.findViewById(R.id.mapInfoText5)).setText("");
+
+            button.setText("Add item");
+        }
+
+        return view;
+    }
+
+    @Nullable
+    @Override
+    public View getInfoWindow(@NonNull Marker marker) {
+        return null;
+    }
 }

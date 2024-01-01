@@ -6,29 +6,24 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
+import com.example.mapapplication.ui.notifications.NotificationsViewModel;
 import com.example.mapapplication.util.HttpHelper;
-import com.google.android.gms.maps.model.LatLng;
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
 import com.google.gson.reflect.TypeToken;
 
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 
 public class HomeViewModel extends ViewModel {
 
     private final MutableLiveData<String> mText;
-    public List<DiscountItem> discountItemList;
+    public MutableLiveData<List<DiscountItem>> discountItemList;
 
     public HomeViewModel() {
         mText = new MutableLiveData<>();
         mText.setValue("This is home fragment");
+        discountItemList = new MutableLiveData<>();
+        discountItemList.setValue(new ArrayList<>());
     }
 
     public LiveData<String> getText() {
@@ -36,13 +31,18 @@ public class HomeViewModel extends ViewModel {
     }
 
     public void load() {
-        String s = HttpHelper.testRequest();
-        Log.d("HomeViewModel", s);
+        String response = HttpHelper.getDiscounts(NotificationsViewModel.getGroupEnCode());
+        Log.d("HomeViewModel", response);
 
-        discountItemList = new Gson().fromJson(s, new TypeToken<ArrayList<DiscountItem>>(){}.getType());
-        for (DiscountItem item : discountItemList)
+        List<DiscountItem> list = new Gson().fromJson(response, new TypeToken<ArrayList<DiscountItem>>(){}.getType());
+
+        if (list.size() != discountItemList.getValue().size())
         {
-            Log.d("HomeViewModel", item.name + " " + item.lat + " " + item.lng);
+            discountItemList.setValue(list);
+            for (DiscountItem item : discountItemList.getValue())
+            {
+                Log.d("HomeViewModel", item.name + " " + item.lat + " " + item.lng);
+            }
         }
     }
 }
